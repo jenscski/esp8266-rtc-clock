@@ -14,16 +14,38 @@ void cbOtaOnStart()
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
     Serial.println("[OTA] Start updating " + type);
+
+    m_Display.write(0x77); // Decimal control	
+    m_Display.write(0x00);
+    m_Display.write(0x79); // Cursor control
+    m_Display.write(0x00);
+    m_Display.printf(" OTA");
+
+    delay(500);
 }
 
 void cbOtaOnEnd()
 {
     Serial.println();
     Serial.println("[OTA] End");
+
+    m_Display.write(0x77); // Decimal control	
+    m_Display.write(0x00);
+
+    m_Display.write(0x79); // Cursor control
+    m_Display.write(0x00);
+    m_Display.printf("BOOT");
 }
 
 void cbOtaOnProgress(unsigned int progress, unsigned int total)
 {
+    m_Display.write(0x77); // Decimal control	
+    m_Display.write(0x00);
+
+    m_Display.write(0x79); // Cursor control
+    m_Display.write(0x00);
+    m_Display.printf("%4u", (progress / (total / 100)));
+
     Serial.printf("[OTA] Progress: %u%%\r", (progress / (total / 100)));
 }
 

@@ -7,6 +7,7 @@
 #include <WiFiUdp.h>
 #include <Schedule.h>
 
+#include <SoftwareSerial.h>
 #include <TaskSchedulerDeclarations.h>
 #include <Timezone.h>
 #include <Wire.h>
@@ -21,6 +22,8 @@ extern Scheduler m_Scheduler;
 extern WiFiUDP m_NtpUdp;
 
 extern Timezone m_Timezone;
+
+extern SoftwareSerial m_Display;
 
 extern RtcDS3231<TwoWire> m_Rtc;
 

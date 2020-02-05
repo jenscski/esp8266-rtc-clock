@@ -6,12 +6,14 @@ bool blinkState = false;
 volatile uint8_t seconds = 0;
 WiFiEventHandler onStationModeGotIPhandler, onStationModeDisconnectedHandler;
 
-ESP8266WebServer m_WebServer(80);
+// ESP8266WebServer m_WebServer(80);
 
 RtcDS3231<TwoWire> m_Rtc(Wire);
 
 WiFiUDP m_NtpUdp;
 Scheduler m_Scheduler;
+
+SoftwareSerial m_Display(-1, D8);
 
 Task m_TaskNtpUpdate(100, 25, &cbNtpUpdate, &m_Scheduler, false, &cbNtpUpdateEnable, &cbNtpUpdateDisable);
 
@@ -22,12 +24,12 @@ Timezone m_Timezone(CEST, CET);
 
 void handleRoot()
 {
-  m_WebServer.send(200, "text/plain", "hello from esp8266!");
+  // m_WebServer.send(200, "text/plain", "hello from esp8266!");
 }
 
 void handleWebUpdate()
 {
-  m_WebServer.send(200, "text/plain", "triggering NTP update");
+  // m_WebServer.send(200, "text/plain", "triggering NTP update");
 
   if (!m_TaskNtpUpdate.isEnabled())
   {
@@ -41,7 +43,7 @@ void onStationConnected(const WiFiEventStationModeGotIP &evt)
     Serial.print(F("[WiFi] Connected: "));
     Serial.println(WiFi.localIP());
 
-    if (MDNS.begin(_hostname, WiFi.localIP()))
+    if (MDNS.begin(_hostname))
     {
       Serial.println(F("[MDNS] Responder started"));
     }
@@ -50,8 +52,6 @@ void onStationConnected(const WiFiEventStationModeGotIP &evt)
     {
       m_TaskNtpUpdate.restartDelayed(TASK_SECOND);
     }
-
-    digitalWrite(LED_BUILTIN, HIGH);
   });
 }
 
@@ -59,8 +59,6 @@ void onStationDisconnected(const WiFiEventStationModeDisconnected &evt)
 {
   schedule_function([](void) {
     Serial.println(F("[WiFi] Disconnected"));
-
-    digitalWrite(LED_BUILTIN, LOW);
   });
 }
 
@@ -69,13 +67,8 @@ void ICACHE_RAM_ATTR handleRtcInterrupt()
   seconds++;
 }
 
-Task tTest(TASK_SECOND, TASK_FOREVER, &handleRtcInterrupt, &m_Scheduler, true);
-
 void setup()
 {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-
   sprintf(_hostname, "esp8266-%06x-clock.local", ESP.getChipId());
 
   Serial.begin(74880, SERIAL_8N1, SERIAL_TX_ONLY);
@@ -84,14 +77,21 @@ void setup()
   Serial.println(_hostname);
   //Serial.println(ESP.getFullVersion());
 
-  Serial1.begin(9600);
-  Serial1.print('v');
+  m_Display.begin(9600, SWSERIAL_8N1);
+  m_Display.print('v');
+
+  m_Display.write(0x7A);    // Brightness control command
+  m_Display.write((byte)0xff); // dimmest value (must type-def 0)
+
+  m_Display.write(0x79);
+  m_Display.write(0x00);
+  m_Display.write("BOOT");
 
   onStationModeGotIPhandler = WiFi.onStationModeGotIP(&onStationConnected);
   onStationModeDisconnectedHandler = WiFi.onStationModeDisconnected(&onStationDisconnected);
 
-  m_WebServer.on("/", handleRoot);
-  m_WebServer.on("/update", handleWebUpdate);
+  // m_WebServer.on("/", handleRoot);
+  // m_WebServer.on("/update", handleWebUpdate);
 
   // rtc 1Hz interrupt
   pinMode(D7, INPUT_PULLUP);
@@ -118,8 +118,10 @@ void setup()
   ArduinoOTA.setHostname(_hostname);
 
   m_NtpUdp.begin(2390);
-  m_WebServer.begin();
+  // m_WebServer.begin();
   ArduinoOTA.begin(false);
+
+  delay(1000);
 }
 
 void loop()
@@ -137,16 +139,16 @@ void loop()
     if (WiFi.status() != WL_CONNECTED)
       data |= 0x02;
 
-    Serial1.write(0x77); // Decimal control command
-    Serial1.write(data);
+    m_Display.write(0x77); // Decimal control command
+    m_Display.write(data);
 
     RtcDateTime dt = m_Rtc.GetDateTime();
 
     time_t now = m_Timezone.toLocal(dt.Epoch32Time());
 
-    Serial1.write(0x79);
-    Serial1.write(0x00);
-    Serial1.printf("%02u%02u", hour(now), minute(now));
+    m_Display.write(0x79);
+    m_Display.write(0x00);
+    m_Display.printf("%02u%02u", hour(now), minute(now));
 
     Serial.printf("%02u.%02u.%04u %02u:%02u:%02u\r\n", day(now), month(now), year(now), hour(now), minute(now), second(now));
   }
@@ -156,6 +158,6 @@ void loop()
     MDNS.update();
     ArduinoOTA.handle();
 
-    m_WebServer.handleClient();
+    // m_WebServer.handleClient();
   }
 }
